@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <memory.h> 
+#include <time.h>
 int8_t a_law(int16_t sample){
     return 0;
 
@@ -46,14 +47,18 @@ typedef struct wav_header_info {
 
 
 void print_wave_header(wav_header * wav_info);
-
 void initialize_struct(wav_header * wav_struct);
 void get_wave_header_info(FILE * wav, wav_header* wav_info);
-
+void write_header_to_new_file(FILE *input, FILE * output);
+unsigned char codeword_compression ( unsigned short sample_magnitude , short sign );
+short get_sign(unsigned short buffer);
+char get_magnitude(unsigned short sample);
+unsigned short get_magnitude_from_codeword(unsigned char codeword);
+void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct);
 int main(int argc, char **argv)
 {
     FILE * wav = fopen(argv[1], "rb");
-    // FILE * compressed_wave = fopen("compressed_wav.md", "wb");
+    FILE * compressed_wave = fopen("new_wav.wav", "wb");
 
     if (wav == NULL)
     {
@@ -65,38 +70,121 @@ int main(int argc, char **argv)
     
     printf("making wav_info structure\n");
     wav_header* wav_info = malloc(sizeof(wav_header)); 
-    initialize_struct(wav_info);
-    
    
-    printf("passing wav_info to get_wave_header function\n");
+    initialize_struct(wav_info);
+
     get_wave_header_info(wav, wav_info);
+    
+
+    write_header_to_new_file(wav, compressed_wave);
+    printf("finished writing header to ouput file\n");
+    read_data(wav, compressed_wave, wav_info);
+
+    
     
     // other_func(wav);
     // printf("Printing wave info\n");
     // print_wave_header(&wav_info);
+    free(wav_info);
     fclose(wav);
+    fclose(compressed_wave);
   
 }
 //data is stored in little endian 
-void read_data(FILE *wav_file,  FILE* output_file, wav_header* wav_struct)
+void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
 {
-    unsigned char buffer[2];
+    unsigned short buffer;
+    short sign;
+    short magnitude;
+    unsigned char * data_of_file = malloc(sizeof(char) * wav_struct->file_size-36);
+    unsigned char * compressed_codeword = malloc(sizeof(char) * wav_struct->file_size-36);
+    //unsigned char * file_data_compressed_codeword = malloc(sizeof(char) * wav_header->file_size-36);
 
-    while (wav_file != NULL)
+    time_t  start = clock();
+    fread(data_of_file, wav_struct->file_size-36, 1, wav_file);
+    unsigned long size = wav_struct->file_size; 
+    int i;
+    for ( i= 0; i < size-36; i++)
     {
-        fread(buffer, sizeof(char), 2, wav);
+        buffer = data_of_file[i] | data_of_file[i+1] << 8;
+        sign = get_sign(buffer);
+        magnitude = get_magnitude(buffer);
+        compressed_codeword[i] = codeword_compression(magnitude, sign);
 
     }
+    time_t  stop = clock();
+    double compression_time = (double) (stop - start) / CLOCKS_PER_SEC;
+    
+    printf("FILE COMPRESSED. time: %d\n", compression_time);
+
+    printf("DECOMPRESSING\n");
+    char buffer_2[2];
+    char sample;
+  
+    for (i= 0; i < size; i++)
+    {
+         
+        sign = (compressed_codeword[i] & 0x80) >> 7;
+        magnitude  = get_magnitude_from_codeword(compressed_codeword[i]);
+        if(sign){
+            sample = magnitude;
+        } else {
+            sample = -magnitude;
+        }
+        buffer_2[0] =  (char)magnitude & 0x000000FF;
+        buffer_2[1] = (char)(magnitude & 0x0000FF00) >> 8;
+        fputs( buffer_2, output );
+    }
+
+    free(data_of_file);
+    free(compressed_codeword);
+}
+void write_header_to_new_file(FILE *input, FILE * output)
+{
+    unsigned char buffer[44];
+    fread(buffer, sizeof(char), 44, input);
+    fputs(buffer, output);
+}
+
+unsigned short get_magnitude_from_codeword(unsigned char codeword)
+{
+    unsigned char chord = (codeword & 0x70) >> 4;;
+    unsigned char step = codeword & 0x0F;
+    int magnitude;
+     
+    if (chord == 0x7) {
+        magnitude = (1 << 7) | (step << 8) | (1 << 12);
+    }
+    else if (chord == 0x6) {
+        magnitude = (1 << 6) | (step << 7) | (1 << 11);
+    }
+    else if (chord == 0x5) {
+        magnitude = (1 << 5) | (step << 6) | (1 << 10);
+    }
+    else if (chord == 0x4) {
+        magnitude = (1 << 4) | (step << 5) | (1 << 9);
+    }
+    else if (chord == 0x3) {
+        magnitude = (1 << 3) | (step << 4) | (1 << 8);
+    }
+    else if (chord == 0x2) {
+        magnitude = (1 << 2) | (step << 3) | (1 << 7);
+    }
+    else if (chord == 0x1) {
+        magnitude = (1 << 1) | (step << 2) | (1 << 6);
+    }
+    else if (chord == 0x0) {
+        magnitude = 1 | (step << 1) | (1 << 5);
+    }
+
+    return (unsigned short) magnitude;
 }
 
 void get_wave_header_info(FILE * wav, wav_header* wav_info)
 {
     printf("START OF GETTING WAVE HEADER INFO\n");
     unsigned char  buffer_32[4];
-    
-
-    
-    
+   
     //RIFF big endian
     printf("GETTING RIFF\n");
     fread(buffer_32, sizeof(char), 4, wav);
@@ -109,22 +197,14 @@ void get_wave_header_info(FILE * wav, wav_header* wav_info)
     //file size little endian
     printf("GETTING FILE SIZE\n");
     fread(buffer_32, sizeof(char), 4, wav);
-   (wav_info)->file_size = (buffer_32[0]) | (buffer_32[1] << 8) | (buffer_32[2] << 16) | (buffer_32[3] << 24);
-    
+    (wav_info)->file_size = (buffer_32[0]) | (buffer_32[1] << 8) | (buffer_32[2] << 16) | (buffer_32[3] << 24);
     // printf("FILE SIZE IS is %d\n", (*wav_info)->file_size);
-   
-    printf("here %x \n", buffer_32);
     memset(buffer_32, 0, 4);
 
     // file_type_header big endian
     printf("GETTING FILE TYPE HEADER\n");
-    
-   
     fread(buffer_32, sizeof(char), 4, wav);
-    printf("here %x \n", buffer_32);
     (wav_info)->file_type_header = ((buffer_32[0]<<24) | (buffer_32[1])<<16 | (buffer_32[2])<<8 | (buffer_32[3]));
-    memset(buffer_32, 0, 4);
-    printf("here %ld \n", (wav_info)->file_type_header);
     memset(buffer_32, 0, 4);
     
 
@@ -194,27 +274,7 @@ void get_wave_header_info(FILE * wav, wav_header* wav_info)
 
 }
 
-// void print_wave_header(wav_header **wav_info)
-// {
-//     printf("START OF PRINTING WAV HEADER INFO\n");
-//     printf("RIFF: " "%" PRIu32"\n", (wav_info)->RIFF);
-//     printf("file_size: " "%" PRIu32 " \n" , (wav_info)->file_size);
-//     printf("file_type_header: " "%" PRIu32 " \n" ,(wav_info)->file_type_header);
-//     printf("chunk_marker: " "%" PRIu32 " \n" ,(wav_info)->format_chunk_marker);
-//     printf("format_data_length: " "%" PRIu32 " \n" ,(wav_info)->format_data_length);
 
-//     printf("format_type: " "%" PRIu16 " \n" ,(wav_info)->format_type);
-//     printf("num_channel: " "%" PRIu16 " \n" ,(wav_info)->num_channel);
-
-//     printf("sample_rate: " "%" PRIu32 " \n" ,(wav_info)->sample_rate);
-//     printf("sr_btsps_channel: " "%" PRIu32 " \n" ,(wav_info)->sr_btsps_channel);
-//     printf("bits_per_sample_channel: " "%" PRIu32 " \n" ,(wav_info)->bits_per_sample_channel);
-
-//     printf("bits_per_sample: " "%" PRIu16 " \n" ,(wav_info)->bits_per_sample);
-
-//     printf("data_header: " "%" PRIu32 " \n" ,(wav_info)->data_header);
-//     printf("sizeof_data_section: " "%" PRIu32 " \n" ,(wav_info)->sizeof_data_section);
-// }
 void initialize_struct(wav_header * wav_struct)
 {
   wav_header *new_struct = malloc(sizeof(new_struct));
@@ -237,43 +297,23 @@ void initialize_struct(wav_header * wav_struct)
 }
 
 
-void other_func(FILE * wav, wav_header **wav_info)
+
+
+
+char get_magnitude(unsigned short sample)
 {
-     unsigned char  buffer_32[4];
-    unsigned char buffer_other[4];
-
-    
-    
-    //RIFF big endian
-    printf("===OTHER===: GETTING RIFF\n");
-    fread(buffer_32, sizeof(char), 4, wav);
-    (*wav_info)->RIFF = ((buffer_32[0]<<24) | (buffer_32[1])<<16 | (buffer_32[2])<<8 | (buffer_32[3]));
-    // memset(buffer_32, 0, 4);
-    printf("===OTHER===:wave riff: %x\n", (*wav_info)->RIFF);
-   
-    //file size little endian
-    printf("===OTHER===:GETTING FILE SIZE\n");
-    fread(buffer_32, sizeof(char), 4, wav);
-    (*wav_info)->file_size = (buffer_32[0]) | (buffer_32[1] << 8) | (buffer_32[2] << 16) | (buffer_32[3] << 24);
-    // memset(buffer_32, 0, 4);
-    printf("===OTHER===:FILE SIZE IS is %d\n", (*wav_info)->file_size);
-
-    // file_type_header big endian
-    printf("===OTHER===:GETTING FILE TYPE HEADER\n");
+    return (unsigned short) (sample < 0 ? -sample : sample);
 }
-
-
-char get_magnitude(){
-    return 'a';
-}
-char get_sign(unsigned char buffer[]){
-    if(buffer[0]<<8 | buffer[1] & 0x8000)
+short get_sign(unsigned short buffer)
+{
+    if(buffer & 0x8000)
     {
         return 1; //positive
     }
     return 0; //negative
 }
-char codeword_compression ( unsigned int sample_magnitude , int sign ) {
+unsigned char codeword_compression ( unsigned short sample_magnitude , short sign ) 
+{
     int chord , step ;
     int codeword_tmp ;
     if( sample_magnitude & (1 << 12)) {
