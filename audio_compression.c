@@ -25,10 +25,10 @@ typedef struct wav_header {
     uint32_t size_of_samples;
 
 
-	unsigned char riff[4];						// RIFF string
+	uint8_t riff[4];						// RIFF string
 	uint32_t file_size;				// overall size of file in bytes
-	unsigned char file_type_header[4];						// WAVE string
-	unsigned char format_chunk_marker[4];			// fmt string with trailing null char
+	uint8_t file_type_header[4];						// WAVE string
+	uint8_t format_chunk_marker[4];			// fmt string with trailing null char
 	uint32_t format_data_length;					// length of the format data
 	uint16_t format_type;					// format type. 1-PCM, 3- IEEE float, 6 - 8bit A law, 7 - 8bit mu law
 	uint16_t num_channel;						// no.of channels
@@ -36,7 +36,7 @@ typedef struct wav_header {
 	uint32_t byterate;						// SampleRate * NumChannels * BitsPerSample/8
 	uint32_t block_align;					// NumChannels * BitsPerSample/8
 	uint16_t bits_per_sample;				// bits per sample, 8- 8bits, 16- 16 bits etc
-	unsigned char data_header [4];		// DATA string or FLLR string
+	uint8_t data_header [4];		// DATA string or FLLR string
 	uint32_t data_size;						// NumSamples * NumChannels * BitsPerSample/8 - size of the next chunk that will be read
 
 
@@ -46,16 +46,17 @@ typedef struct wav_header {
 void print_wave_header(wav_header * wav_info);
 void initialize_struct(wav_header * wav_struct);
 void get_wave_header_info(FILE * wav, wav_header* wav_info);
-void write_header_to_new_file(FILE *input, FILE * output);
-unsigned char codeword_compression ( unsigned short sample_magnitude , short sign );
-short get_sign(short buffer);
-char get_magnitude(short sample);
-unsigned short get_magnitude_from_codeword(unsigned char codeword);
+//void write_header_to_new_file(FILE *input, FILE * output);
+void write_header_to_new_file(wav_header * wav_info, FILE * output);
+uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign );
+uint8_t get_sign(short buffer);
+uint16_t get_magnitude(short sample);
+uint16_t get_magnitude_from_codeword(uint8_t codeword);
 void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct);
 int main(int argc, char **argv)
 {
     //FILE * wav = fopen(argv[1], "rb");
-    FILE * wav = fopen("haazah.wav", "rb");
+    FILE * wav = fopen("input.wav", "rb");
 
     FILE * compressed_wave = fopen("new_wav.wav", "wb");
 
@@ -75,7 +76,11 @@ int main(int argc, char **argv)
     get_wave_header_info(wav, wav_info);
     
 
-    write_header_to_new_file(wav, compressed_wave);
+
+    //write_header_to_new_file(wav, compressed_wave);
+    write_header_to_new_file(wav_info, compressed_wave);
+    
+
     printf("finished writing header to ouput file\n");
     read_data(wav, compressed_wave, wav_info);
 
@@ -94,14 +99,15 @@ int main(int argc, char **argv)
 void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
 {
     short buffer;
-    short sign;
-    unsigned short magnitude;
-    int size = (int)(wav_struct->file_size+8-44); 
-    unsigned char * data_of_file = malloc(sizeof(unsigned char) *size);
-    unsigned char * compressed_codeword = malloc(sizeof(unsigned char) * size);
-    //unsigned char * file_data_compressed_codeword = malloc(sizeof(char) * wav_header->file_size-36);
+    short in_sample;
+    uint8_t sign;
+    uint16_t magnitude;
+    int size = ((int)wav_struct->file_size+8-44); 
+    uint8_t * data_of_file = malloc(sizeof(uint8_t) *size);
+    uint8_t * compressed_codeword = malloc(sizeof(uint8_t) * size);
+    //uint8_t * file_data_compressed_codeword = malloc(sizeof(char) * wav_header->file_size-36);
 
-    fseek(wav_file,44,SEEK_SET);
+    //fseek(wav_file,44,SEEK_SET);
 
     time_t  start = clock();
     fread(data_of_file, size, 1, wav_file);
@@ -118,87 +124,154 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
         magnitude = get_magnitude(buffer);
         compressed_codeword[i] = codeword_compression(magnitude, sign);
         count++;
-
+        fwrite( &compressed_codeword[i],sizeof(compressed_codeword[i]),1, output );
+        //printf("codeword: %d\n",compressed_codeword[i]);
     }
     time_t  stop = clock();
     double compression_time = (double) (stop - start) / CLOCKS_PER_SEC;
     
     printf("FILE COMPRESSED. time: %f\n", compression_time);
-
-    printf("DECOMPRESSING\n");
-    char buffer_2[2];
-    char sample;
-  
-  
-    for (i= 0; i < count; i++)
-    {
-         
-        sign = (compressed_codeword[i] & 0x80) >> 7;
-        magnitude  = get_magnitude_from_codeword(compressed_codeword[i]);
-        magnitude = magnitude;
-        if(sign){
-            sample = magnitude;
-        } else {
-            sample = -magnitude;
-        }
-        sample = sample << 3;
-        buffer_2[0] =  (char)sample & 0x000000FF;
-        buffer_2[1] = (char)(sample & 0x0000FF00) >> 8;
-        fwrite( buffer_2,sizeof(buffer_2),1, output );
-    }
-
+    printf("Iteration in compression loop: %d\n", count);
+   
     free(data_of_file);
     free(compressed_codeword);
 }
-
+/*
 void write_header_to_new_file(FILE *input, FILE * output)
 {
-    unsigned char buffer[44];
+    uint8_t buffer[44];
     fseek(input,0,SEEK_SET);
-    fread(buffer, sizeof(unsigned char), 44, input);
+    fread(buffer, sizeof(buffer) ,1, input);
     fwrite(buffer, sizeof(buffer),1,output);
 }
+*/
+void write_header_to_new_file(wav_header* wav_info, FILE * output)
+{   
+    uint8_t buffer_2[2];
+    uint8_t buffer_4[4];
+    uint32_t new_file_size;
+    uint32_t new_data_size;
 
-unsigned short get_magnitude_from_codeword(unsigned char codeword)
+
+
+    fseek(output,0,SEEK_SET);
+    fwrite(&wav_info->riff, sizeof(wav_info->riff),1,output);
+    
+    //file size
+    new_file_size = ((wav_info->file_size - 36) / 2) + 36;
+    buffer_4[3] = new_file_size & 0xFF;
+    buffer_4[2] = (new_file_size >> 8) & 0xFF;
+    buffer_4[1] = (new_file_size >> 16) & 0xFF;
+    buffer_4[0] = (new_file_size >> 24) & 0xFF;
+    fwrite(&buffer_4[3], 1, 1, output);
+    fwrite(&buffer_4[2], 1, 1, output);
+    fwrite(&buffer_4[1], 1, 1, output);
+    fwrite(&buffer_4[0], 1, 1, output); 
+    memset(buffer_4, 0, sizeof(buffer_4));
+    
+
+
+    fwrite(&wav_info->file_type_header, sizeof(wav_info->file_type_header),1,output);
+    fwrite(&wav_info->format_chunk_marker, sizeof(wav_info->format_chunk_marker),1,output);
+    fwrite(&wav_info->format_data_length, sizeof(uint32_t),1,output);
+    //fwrite(&wav_info->format_type, sizeof(uint16_t),1,output);
+    
+    buffer_2[0] = 6;
+    buffer_2[1] = '\0';
+    fwrite(&buffer_2[0], 1, 1, output);
+    fwrite(&buffer_2[1], 1, 1, output);
+    memset(buffer_2, 0, sizeof(buffer_2));
+
+
+    fwrite(&wav_info->num_channel, sizeof(uint16_t),1,output);
+    fwrite(&wav_info->sample_rate, sizeof(uint32_t),1,output);
+    
+    // byte rate
+    buffer_4[3] = wav_info->byterate & 0xFF;
+    buffer_4[2] = (wav_info->byterate >> 8) & 0xFF;
+    buffer_4[1] = (wav_info->byterate >> 16) & 0xFF;
+    buffer_4[0] = (wav_info->byterate >> 24) & 0xFF;
+    fwrite(&buffer_4[3], 1, 1, output);
+    fwrite(&buffer_4[2], 1, 1, output);
+    fwrite(&buffer_4[1], 1, 1, output);
+    fwrite(&buffer_4[0], 1, 1, output); 
+    memset(buffer_4, 0, sizeof(buffer_4));
+    
+    //block align
+    buffer_2[1] = wav_info->block_align & 0xFF;
+    buffer_2[0] = (wav_info->block_align >> 8) & 0xFF;
+    fwrite(&buffer_2[1], 1, 1, output);
+    fwrite(&buffer_2[0], 1, 1, output);
+    memset(buffer_2, 0, sizeof(buffer_2));
+    //fwrite(&wav_info->block_align, sizeof(uint32_t),1,output);
+
+    //bits per sample
+    buffer_2[0] = wav_info->bits_per_sample;
+    buffer_2[1] = '\0';
+    fwrite(&buffer_2[0], 1, 1, output);
+    fwrite(&buffer_2[1], 1, 1, output);
+    memset(buffer_2, 0, sizeof(buffer_2));
+    //fwrite(&wav_info->bits_per_sample, sizeof(uint16_t),1,output);
+
+    fwrite(&wav_info->data_header, sizeof(wav_info->data_header),1,output);
+    
+    //data size
+    new_data_size = new_file_size - 36;
+    buffer_4[3] = new_data_size & 0xFF;
+    buffer_4[2] = (new_data_size >> 8) & 0xFF;
+    buffer_4[1] = (new_data_size >> 16) & 0xFF;
+    buffer_4[0] = (new_data_size >> 24) & 0xFF;
+    fwrite(&buffer_4[3], 1, 1, output);
+    fwrite(&buffer_4[2], 1, 1, output);
+    fwrite(&buffer_4[1], 1, 1, output);
+    fwrite(&buffer_4[0], 1, 1, output); 
+    memset(buffer_4, 0, sizeof(buffer_4));
+    //fwrite(&wav_info->data_size, sizeof(uint32_t),1,output);
+
+
+}
+
+
+uint16_t get_magnitude_from_codeword(uint8_t codeword)
 {
-    unsigned char chord = (codeword & 0x70) >> 4;;
-    unsigned char step = codeword & 0x0F;
-    int magnitude;
+    uint8_t chord = (codeword & 0x70) >> 4;;
+    uint8_t step = codeword & 0x0F;
+    uint32_t magnitude;
      
     if (chord == 0x7) {
-        magnitude = (1 << 7) | (step << 8) | (1 << 12);
+        magnitude = (1 << 7) | (step << 8) | (1 << 11);
     }
     else if (chord == 0x6) {
-        magnitude = (1 << 6) | (step << 7) | (1 << 11);
+        magnitude = (1 << 6) | (step << 7) | (1 << 10);
     }
     else if (chord == 0x5) {
-        magnitude = (1 << 5) | (step << 6) | (1 << 10);
+        magnitude = (1 << 5) | (step << 6) | (1 << 9);
     }
     else if (chord == 0x4) {
-        magnitude = (1 << 4) | (step << 5) | (1 << 9);
+        magnitude = (1 << 4) | (step << 5) | (1 << 8);
     }
     else if (chord == 0x3) {
-        magnitude = (1 << 3) | (step << 4) | (1 << 8);
+        magnitude = (1 << 3) | (step << 4) | (1 << 7);
     }
     else if (chord == 0x2) {
-        magnitude = (1 << 2) | (step << 3) | (1 << 7);
+        magnitude = (1 << 2) | (step << 3) | (1 << 6);
     }
     else if (chord == 0x1) {
-        magnitude = (1 << 1) | (step << 2) | (1 << 6);
+        magnitude = (1 << 1) | (step << 2) | (1 << 5);
     }
     else if (chord == 0x0) {
-        magnitude = 1 | (step << 1) | (1 << 5);
+        magnitude = 1 | (step << 1) | (1 << 4);
     }
 
-    return (unsigned short) magnitude;
+    return (uint16_t) magnitude;
 }
 
 void get_wave_header_info(FILE* wav, wav_header* wav_info)
 {
     printf("START OF GETTING WAVE HEADER INFO\n");
-    unsigned char buffer_4[4];
-    unsigned char buffer_2[2];
-    //unsigned char* buffer_4 = (unsigned char*)calloc(4,sizeof(unsigned char));
+    uint8_t buffer_4[4];
+    uint8_t buffer_2[2];
+    //uint8_t* buffer_4 = (uint8_t*)calloc(4,sizeof(uint8_t));
    
     //RIFF big endian
     printf("GETTING RIFF\n");
@@ -207,7 +280,7 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
 
     //printf("here %x \n", buffer_4);
     //(wav_info)->riff = ((buffer_4[0]<<24) | (buffer_4[1])<<16 | (buffer_4[2])<<8 | (buffer_4[3]));
-    //memset(buffer_4, 0, 4*sizeof(unsigned char));
+    //memset(buffer_4, 0, 4*sizeof(uint8_t));
     //fflush(stdout);
   
     //file size little endian
@@ -223,14 +296,14 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
     printf("GETTING FILE TYPE HEADER\n");
     fread((wav_info)->file_type_header, sizeof((wav_info)->file_type_header), 1, wav);
     //(wav_info)->file_type_header = ((buffer_4[0]<<24) | (buffer_4[1])<<16 | (buffer_4[2])<<8 | (buffer_4[3]));
-    //memset(buffer_4, 0, 4*sizeof(unsigned char));
+    //memset(buffer_4, 0, 4*sizeof(uint8_t));
    
  
     // //format_chunk_marker big endian
     printf("GETTING CHUNK MARKER\n");
     fread((wav_info)->format_chunk_marker, sizeof((wav_info)->format_chunk_marker), 1, wav);
     //(wav_info)->format_chunk_marker = ((buffer_4[0]<<24) | (buffer_4[1])<<16 | (buffer_4[2])<<8 | (buffer_4[3]));
-    //memset(buffer_4, 0, 4*sizeof(unsigned char));
+    //memset(buffer_4, 0, 4*sizeof(uint8_t));
     //printf("file type header: %ld\n",(wav_info)->format_chunk_marker );
     
     
@@ -244,7 +317,11 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
     //format_type little endian
     printf("GETTING FORMAT TYPE\n");
     fread(buffer_2, sizeof(buffer_2), 1, wav);
+ 
     (wav_info)->format_type = (buffer_2[0] | (buffer_2[1] << 8));
+    
+    printf("Format Type: %d\n",(wav_info)->format_type);
+
     memset(buffer_2, 0, sizeof(buffer_2));
 
 
@@ -259,6 +336,8 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
     fread(buffer_4, sizeof(buffer_4), 1, wav);
     (wav_info)->sample_rate = (buffer_4[0]) | (buffer_4[1] << 8) | (buffer_4[2] << 16) | (buffer_4[3] << 24);
     memset(buffer_4, 0, sizeof(buffer_4));
+
+    printf("Sample rate : %d\n",(wav_info)->sample_rate);
 
     //sr_btsps_channel little endian
     printf("GETTING BYTERATE\n");
@@ -282,8 +361,8 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
     printf("GETTING DATA HEADER\n");
     fread((wav_info)->data_header, sizeof((wav_info)->data_header), 1, wav);
     //(wav_info)->data_header = ((buffer_4[0]<<24) | (buffer_4[1])<<16 | (buffer_4[2])<<8 | (buffer_4[3]));
-   // memset(buffer_4, 0, 4*sizeof(unsigned char));
-
+   // memset(buffer_4, 0, 4*sizeof(uint8_t));
+    printf("%c%c%c%c\n",(wav_info)->data_header[0],(wav_info)->data_header[1],(wav_info)->data_header[2],(wav_info)->data_header[3]);
     //sizeof_data_section
     printf("GETTING SIZE OF DATA SECTION\n");
     fread(buffer_4, sizeof(buffer_4), 1, wav);
@@ -296,6 +375,8 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
     (wav_info)->samples = (8 * (wav_info)->data_size) / ((wav_info)->num_channel * (wav_info)->bits_per_sample);
     (wav_info)->size_of_samples = ((wav_info)->num_channel * (wav_info)->bits_per_sample) / 8;
 
+    printf("num sample %d, size sample %d\n",(wav_info)->samples,(wav_info)->size_of_samples);
+    printf("BPS %d\n",(wav_info)->bits_per_sample);
 
 }
 
@@ -307,7 +388,7 @@ void initialize_struct(wav_header * wav_struct)
     new_struct->size_of_samples= 0;
    
     new_struct->RIFF=0;
-    //new_struct->RIFF= (unsigned char*)malloc(4*sizeof(unsigned char)); 
+    //new_struct->RIFF= (uint8_t*)malloc(4*sizeof(uint8_t)); 
    
     new_struct->overall_size= 0;
     new_struct->wave= 0;
@@ -324,70 +405,74 @@ void initialize_struct(wav_header * wav_struct)
     new_struct->sizeof_data_section= 0;
     wav_struct = new_struct;
 }
-*/
-char get_magnitude(short sample)
+**/
+uint16_t get_magnitude(short sample)
 {
-    return (unsigned short) (sample < 0 ? -sample : sample);
+    return (uint16_t) (sample < 0 ? -sample : sample);
 }
-short get_sign(short buffer)
+uint8_t get_sign(short buffer)
 {
     if(buffer >= 0)
     {
         return 1; //positive
     }
-    return 0; //negative
+    else 
+    {
+        return 0; //negative
+    }
+    
 }
-unsigned char codeword_compression ( unsigned short sample_magnitude , short sign ) 
+uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign ) 
 {
-    int chord , step ;
-    int codeword_tmp ;
+    uint8_t chord , step ;
+    uint8_t codeword_tmp ;
     if( sample_magnitude & (1 << 11)) {
         chord = 0x7 ;
         step = ( sample_magnitude >> 7) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
     if( sample_magnitude & (1 << 10)) {
         chord = 0x6 ;
         step = ( sample_magnitude >> 6) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
     if( sample_magnitude & (1 << 9)) {
         chord = 0x5 ;
         step = ( sample_magnitude >> 5) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
     if( sample_magnitude & (1 << 8)) {
         chord = 0x4 ;
         step = ( sample_magnitude >> 4) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
     if( sample_magnitude & (1 << 7)) {
         chord = 0x3 ;
         step = ( sample_magnitude >> 3) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
     if( sample_magnitude & (1 << 6)) {
         chord = 0x2 ;
         step = ( sample_magnitude >> 2) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
     if( sample_magnitude & (1 << 5)) {
         chord = 0x1 ;
         step = ( sample_magnitude >> 1) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 4)) {
+    if( sample_magnitude >> 5 == 0) {
         chord = 0x0 ;
         step = ( sample_magnitude ) & 0xF ;
         codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return ( (char) codeword_tmp );
+        return (codeword_tmp );
     }
 }
 
