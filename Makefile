@@ -4,3 +4,4 @@ run: audio_compression haazah.wav
 	./audio_compression haazah.wav
 clean: 
 	rm audio_compression
+	rm new_wav.wav
