@@ -8,23 +8,7 @@
 #include <time.h>
 #include <stdbool.h> 
 
-int chord1;
-int chord2;
-int chord3;
-int chord4;
-int chord5;
-int chord6;
-int chord7;
-int chord8;
 
-int decomp_chord1;
-int decomp_chord2;
-int decomp_chord3;
-int decomp_chord4;
-int decomp_chord5;
-int decomp_chord6;
-int decomp_chord7;
-int decomp_chord8;
 
 
 int oustide_counter;
@@ -136,24 +120,7 @@ void write_two_bytes(FILE * output, uint16_t data, bool little_endian)
 
     }
 }
-void write_two_bytes_other(FILE * output, uint16_t data, bool little_endian)
-{
-    uint8_t buffer_2[2];
-    if(little_endian)
-    {
-        buffer_2[1] = data & 0x000000FF;
-        buffer_2[0] = (data & 0x0000FF00) >>8;
-        fwrite(&buffer_2[1], 1, 1, output);
-        fwrite(&buffer_2[0], 1, 1, output); 
-        oustide_counter++; 
-    } else {
-        buffer_2[1] = data & 0xFF;
-        buffer_2[0] = (data >> 8) & 0xFF;
-        fwrite(&buffer_2[0], 1, 1, output);
-        fwrite(&buffer_2[1], 1, 1, output);
 
-    }
-}
 
 
 
@@ -164,66 +131,53 @@ uint8_t codeword_compression ( unsigned short sample_magnitude , short sign )
     if( sample_magnitude & (1 << 11)) {
         chord = 0x7 ;
         step = ( sample_magnitude >> 7) & 0xF ;
-        chord1++;
+        
         
     }
     else if( sample_magnitude & (1 << 10)) {
         chord = 0x6 ;
         step = ( sample_magnitude >> 6) & 0xF ;
-        chord2++;
+        
 
     }
     else if( sample_magnitude & (1 << 9)) {
         chord = 0x5 ;
         step = ( sample_magnitude >> 5) & 0xF ;
-        chord3++;
+        
         
     }
     else if( sample_magnitude & (1 << 8)) {
         chord = 0x4 ;
         step = ( sample_magnitude >> 4) & 0xF ;
-        chord4++;
+        
     }
     else if( sample_magnitude & (1 << 7)) {
         chord = 0x3 ;
         step = ( sample_magnitude >> 3) & 0xF ;
-        chord5++;
+        
     }
     else if( sample_magnitude & (1 << 6)) {
         chord = 0x2 ;
         step = ( sample_magnitude >> 2) & 0xF ;
-        chord6++;
+        
        
     }
     else if( sample_magnitude & (1 << 5)) {
         chord = 0x1 ;
         step = ( sample_magnitude >> 1) & 0xF ;
-        chord7++;
+        
     }
     else {
         chord = 0x0 ;
         step = ( sample_magnitude >> 1) & 0xF ;
-        chord8++;
+        
         
     }
     codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
     return (uint8_t)(codeword_tmp );
 }
 
-void set_new_file_size(FILE* output, uint32_t new_file_size)
-{
-    uint8_t buffer_4[4];
-    fseek(output, 54 ,SEEK_SET);
-    uint32_t header_size = new_file_size + 58 -8;
-    uint32_t sample_length = new_file_size;
-    write_four_bytes(output, header_size, true);
-    
-    fseek(output, 46 ,SEEK_SET);
-    write_four_bytes(output, sample_length, true);
 
-
-
-}
 
 unsigned short get_magnitude_from_codeword(char codeword)
 {
@@ -233,61 +187,54 @@ unsigned short get_magnitude_from_codeword(char codeword)
      
     if (chord == 0x7) {
         magnitude = (1 << 6) | (step << 8) | (1 << 11);
-        decomp_chord1++;
+        
     }
     else if (chord == 0x6) {
         magnitude = (1 << 5) | (step << 7) | (1 << 10);
-        decomp_chord2++;
+       
     }
     else if (chord == 0x5) {
         magnitude = (1 << 4) | (step << 6) | (1 << 9);
-        decomp_chord3++;
+       
     }
     else if (chord == 0x4) {
         magnitude = (1 << 3) | (step << 5) | (1 << 8);
-        decomp_chord4++;
+        
     }
     else if (chord == 0x3) {
         magnitude = (1 << 2) | (step << 4) | (1 << 7);
-        decomp_chord5++;
+        
     }
     else if (chord == 0x2) {
         magnitude = (1 << 1) | (step << 3) | (1 << 6);
-        decomp_chord6++;
+        
     }
     else if (chord == 0x1) {
         magnitude = (1) | (step << 2) | (1 << 5);
-        decomp_chord7++;
+        
     }
     else {
         magnitude = 1 | (step << 1) ;
-        decomp_chord8++;
+        
     }
 
     return  (unsigned short)magnitude;
 }
 
-void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
+
+int  compress_data(FILE *wav_file, FILE *output, wav_header* wav_struct,uint8_t * compressed_codeword, int size)
 {
     short sample;
     short in_sample;
     short sign;
     unsigned short magnitude;
-    int size = ((int)wav_struct->file_size+8-44); 
     short * data_of_file = malloc(sizeof(short) *size);
-    uint8_t * compressed_codeword = malloc(sizeof(uint8_t) * size);
-    //uint8_t * file_data_compressed_codeword = malloc(sizeof(char) * wav_header->file_size-36);
-
     fseek(wav_file,44,SEEK_SET);
-
-    time_t  start = clock();
     fread(data_of_file, size, 1, wav_file);
-   
     int i;
     int count = 0;
-
-    //printf("SIZE:  %d\n",size);
-    printf("compressing Data\n");
+    time_t  start = clock();
+    
     for ( i= 0; i < size-1; i+=2)
     {
         sample = (data_of_file[i] | data_of_file[i+1] << 8) >> 3;
@@ -295,51 +242,40 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
         magnitude = get_magnitude(sample);
         compressed_codeword[i] = codeword_compression(magnitude, sign);
         count++;
-        //fwrite( &compressed_codeword[i],sizeof(compressed_codeword[i]),1, output );
+        
         
     }
-    printf("finished compressing\n");
+    
+    
     time_t  stop = clock();
     double compression_time = (double) (stop - start) / CLOCKS_PER_SEC;
-    //set_new_file_size(output, count);
+    printf("FILE COMPRESSED. time: %f\n", compression_time);
+    free(data_of_file);
+    return count;
+   
+    
+   
+}
+
+void decompress_data(FILE * output, uint8_t * compressed_codeword, int count)
+{
     short out_sample;
     unsigned short out_magnitude;
     short out_sign;
-    int another_counter = 0;
     __uint8_t  comp_codeword;
-    
-     
-     printf("decompressing data now\n");
+    int i=0;
     for (i=0; i < count; i++)
     {
-        //printf("seg fault happens at %d\n", i);
+        
         comp_codeword = compressed_codeword[i];
         out_sign = (comp_codeword &0x80 ) >> 7;
         out_magnitude = get_magnitude_from_codeword(comp_codeword);
         out_sample =  (short)(out_sign ? out_magnitude : -out_magnitude);
-        write_two_bytes_other(output, (uint16_t)(out_sample<<3), true);
-        
-        
-        another_counter++;
-
-
-    }
-    printf("finished decompressing data\n");
+        write_two_bytes(output, (uint16_t)(out_sample<<3), true);
   
-
-    printf("chord count: count1: %d count2: %d count3: %d count4: %d count5:%d count6:%d count7:%d count8:%d \n", chord1, chord2, chord3, chord4, chord5, chord6, chord7, chord8);
-    printf("total: %d\n", chord1+ chord2+ chord3+ chord4+ chord5+ chord6+ chord7+ chord8);
-    printf("decomp chord count: count1: %d count2: %d count3: %d count4: %d count5:%d count6:%d count7:%d count8:%d \n", decomp_chord1, decomp_chord2, decomp_chord3, decomp_chord4, decomp_chord5, decomp_chord6, decomp_chord7, decomp_chord8);
-    printf("total: %d\n", decomp_chord1+ decomp_chord2+ decomp_chord3+ decomp_chord4+ decomp_chord5+ decomp_chord6+ decomp_chord7+ decomp_chord8);
-    printf("FILE COMPRESSED. time: %f\n", compression_time);
-    printf("Iteration in compression loop: %d\n", count);
-    printf("anoter counter: %d\n", another_counter);
-    printf("outside counter: %d\n", oustide_counter);
-    printf("size of codeword compressed: %ld\n", strlen(compressed_codeword));
-    
-    free(data_of_file);
-    free(compressed_codeword);
+    }
 }
+
 
 void write_header_to_new_file(wav_header* wav_info, FILE * output)
 {   
@@ -626,7 +562,7 @@ void copy_header_to_new_file(FILE *input, FILE * output)
 
 int main(int argc, char **argv)
 {
-    //FILE * wav = fopen(argv[1], "rb");
+    
     FILE * wav = fopen("input.wav", "rb");
 
     FILE * compressed_wave = fopen("new_wav.wav", "wb");
@@ -642,30 +578,28 @@ int main(int argc, char **argv)
     printf("making wav_info structure\n");
     wav_header* wav_info = (wav_header*)malloc(sizeof(wav_header)); 
    
-    //initialize_struct(wav_info);
 
     get_wave_header_info(wav, wav_info);
     
 
 
     copy_header_to_new_file(wav, compressed_wave);
-   // write_header_to_new_file(wav_info, compressed_wave);
-//    write_uncompressed_header(wav_info, compressed_wave);
+  
     
-
-    printf("finished writing header to ouput file\n");
-    read_data(wav, compressed_wave, wav_info);
+    int size = ((int)wav_info->file_size+8-44);
+    uint8_t * compressed_codeword = malloc(sizeof(uint8_t) * size);
+    int count = compress_data(wav, compressed_wave, wav_info, compressed_codeword, size);
+    decompress_data(compressed_wave, compressed_codeword, count);
 
     
-    // other_func(wav);
-    // printf("Printing wave info\n");
-    // print_wave_header(&wav_info);
+    
     free(wav_info);
+    free(compressed_codeword);
     fclose(wav);
     fclose(compressed_wave);
   
 }
-//data is stored in little endian 
+
 
 
 
