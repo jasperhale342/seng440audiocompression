@@ -8,6 +8,25 @@
 #include <time.h>
 #include <stdbool.h> 
 
+int chord1;
+int chord2;
+int chord3;
+int chord4;
+int chord5;
+int chord6;
+int chord7;
+int chord8;
+
+int decomp_chord1;
+int decomp_chord2;
+int decomp_chord3;
+int decomp_chord4;
+int decomp_chord5;
+int decomp_chord6;
+int decomp_chord7;
+int decomp_chord8;
+
+
 int oustide_counter;
 typedef struct wav_header {
     uint32_t samples;
@@ -55,9 +74,9 @@ typedef struct wav_header {
 
 }  wav_header;
 
-uint16_t get_magnitude(short sample)
+unsigned short get_magnitude(short sample)
 {
-    return (uint16_t) (sample < 0 ? -sample : sample);
+    return (unsigned short) (sample < 0 ? -sample : sample);
 }
 
 uint8_t get_sign(short buffer)
@@ -138,52 +157,57 @@ void write_two_bytes_other(FILE * output, uint16_t data, bool little_endian)
 
 
 
-uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign ) 
+uint8_t codeword_compression ( unsigned short sample_magnitude , short sign ) 
 {
-    uint8_t chord , step ;
-    uint8_t codeword_tmp ;
+    int chord , step ;
+    int codeword_tmp ;
     if( sample_magnitude & (1 << 11)) {
         chord = 0x7 ;
         step = ( sample_magnitude >> 7) & 0xF ;
+        chord1++;
         
     }
     else if( sample_magnitude & (1 << 10)) {
         chord = 0x6 ;
         step = ( sample_magnitude >> 6) & 0xF ;
+        chord2++;
 
     }
     else if( sample_magnitude & (1 << 9)) {
         chord = 0x5 ;
         step = ( sample_magnitude >> 5) & 0xF ;
+        chord3++;
         
     }
     else if( sample_magnitude & (1 << 8)) {
         chord = 0x4 ;
         step = ( sample_magnitude >> 4) & 0xF ;
-      
+        chord4++;
     }
     else if( sample_magnitude & (1 << 7)) {
         chord = 0x3 ;
         step = ( sample_magnitude >> 3) & 0xF ;
-        
+        chord5++;
     }
     else if( sample_magnitude & (1 << 6)) {
         chord = 0x2 ;
         step = ( sample_magnitude >> 2) & 0xF ;
+        chord6++;
        
     }
     else if( sample_magnitude & (1 << 5)) {
         chord = 0x1 ;
         step = ( sample_magnitude >> 1) & 0xF ;
-        
+        chord7++;
     }
     else {
         chord = 0x0 ;
         step = ( sample_magnitude >> 1) & 0xF ;
+        chord8++;
         
     }
     codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-    return (codeword_tmp );
+    return (uint8_t)(codeword_tmp );
 }
 
 void set_new_file_size(FILE* output, uint32_t new_file_size)
@@ -201,35 +225,43 @@ void set_new_file_size(FILE* output, uint32_t new_file_size)
 
 }
 
-unsigned short get_magnitude_from_codeword(uint8_t codeword)
+unsigned short get_magnitude_from_codeword(char codeword)
 {
-    uint8_t chord = (codeword & 0x70) >> 4;;
-    uint8_t step = codeword & 0x0F;
+    int chord = (codeword & 0x70) >> 4;;
+    int step = codeword & 0x0F;
     int magnitude;
      
     if (chord == 0x7) {
-        magnitude = (1 << 7) | (step << 8) | (1 << 11);
+        magnitude = (1 << 6) | (step << 8) | (1 << 11);
+        decomp_chord1++;
     }
     else if (chord == 0x6) {
-        magnitude = (1 << 6) | (step << 7) | (1 << 10);
+        magnitude = (1 << 5) | (step << 7) | (1 << 10);
+        decomp_chord2++;
     }
     else if (chord == 0x5) {
-        magnitude = (1 << 5) | (step << 6) | (1 << 9);
+        magnitude = (1 << 4) | (step << 6) | (1 << 9);
+        decomp_chord3++;
     }
     else if (chord == 0x4) {
-        magnitude = (1 << 4) | (step << 5) | (1 << 8);
+        magnitude = (1 << 3) | (step << 5) | (1 << 8);
+        decomp_chord4++;
     }
     else if (chord == 0x3) {
-        magnitude = (1 << 3) | (step << 4) | (1 << 7);
+        magnitude = (1 << 2) | (step << 4) | (1 << 7);
+        decomp_chord5++;
     }
     else if (chord == 0x2) {
-        magnitude = (1 << 2) | (step << 3) | (1 << 6);
+        magnitude = (1 << 1) | (step << 3) | (1 << 6);
+        decomp_chord6++;
     }
     else if (chord == 0x1) {
-        magnitude = (1 << 1) | (step << 2) | (1 << 5);
+        magnitude = (1) | (step << 2) | (1 << 5);
+        decomp_chord7++;
     }
     else {
-        magnitude = 1 | (step << 1) | (1 << 4);
+        magnitude = 1 | (step << 1) ;
+        decomp_chord8++;
     }
 
     return  magnitude;
@@ -239,8 +271,8 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
 {
     short buffer;
     short in_sample;
-    uint8_t sign;
-    uint16_t magnitude;
+    short sign;
+    unsigned short magnitude;
     int size = ((int)wav_struct->file_size+8-44); 
     uint8_t * data_of_file = malloc(sizeof(uint8_t) *size);
     uint8_t * compressed_codeword = malloc(sizeof(uint8_t) * size);
@@ -273,17 +305,32 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
     unsigned short out_magnitude;
     short out_sign;
     int another_counter = 0;
+    __uint8_t  comp_codeword;
     compressed_codeword[size+3];
+     FILE * something = fopen("something.md", "wb");
     for (i=0; i < count; i++)
     {
-        out_sign = (compressed_codeword[i] &0x80 ) >> 7;
-        out_magnitude = get_magnitude_from_codeword(compressed_codeword[i]);
+        comp_codeword = compressed_codeword[i];
+        out_sign = (comp_codeword &0x80 ) >> 7;
+        out_magnitude = get_magnitude_from_codeword(comp_codeword);
         out_sample =  (short)(out_sign ? out_magnitude : -out_magnitude);
         write_two_bytes_other(output, (uint16_t)(out_sample<<3), true);
+        if(ftell(something) < 4)
+        {
+            write_two_bytes_other(something, (uint16_t)(out_sample<<3), true);
+        }
+        
         another_counter++;
 
 
     }
+    fclose(something);
+
+
+    printf("chord count: count1: %d count2: %d count3: %d count4: %d count5:%d count6:%d count7:%d count8:%d \n", chord1, chord2, chord3, chord4, chord5, chord6, chord7, chord8);
+    printf("total: %d\n", chord1+ chord2+ chord3+ chord4+ chord5+ chord6+ chord7+ chord8);
+    printf("decomp chord count: count1: %d count2: %d count3: %d count4: %d count5:%d count6:%d count7:%d count8:%d \n", decomp_chord1, decomp_chord2, decomp_chord3, decomp_chord4, decomp_chord5, decomp_chord6, decomp_chord7, decomp_chord8);
+    printf("total: %d\n", decomp_chord1+ decomp_chord2+ decomp_chord3+ decomp_chord4+ decomp_chord5+ decomp_chord6+ decomp_chord7+ decomp_chord8);
     printf("FILE COMPRESSED. time: %f\n", compression_time);
     printf("Iteration in compression loop: %d\n", count);
     printf("anoter counter: %d\n", another_counter);
