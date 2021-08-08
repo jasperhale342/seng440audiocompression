@@ -264,21 +264,21 @@ unsigned short get_magnitude_from_codeword(char codeword)
         decomp_chord8++;
     }
 
-    return  magnitude;
+    return  (unsigned short)magnitude;
 }
 
 void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
 {
-    short buffer;
+    short sample;
     short in_sample;
     short sign;
     unsigned short magnitude;
     int size = ((int)wav_struct->file_size+8-44); 
-    uint8_t * data_of_file = malloc(sizeof(uint8_t) *size);
+    short * data_of_file = malloc(sizeof(short) *size);
     uint8_t * compressed_codeword = malloc(sizeof(uint8_t) * size);
     //uint8_t * file_data_compressed_codeword = malloc(sizeof(char) * wav_header->file_size-36);
 
-    //fseek(wav_file,44,SEEK_SET);
+    fseek(wav_file,44,SEEK_SET);
 
     time_t  start = clock();
     fread(data_of_file, size, 1, wav_file);
@@ -287,17 +287,18 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
     int count = 0;
 
     //printf("SIZE:  %d\n",size);
-   
+    printf("compressing Data\n");
     for ( i= 0; i < size-1; i+=2)
     {
-        buffer = (data_of_file[i] | data_of_file[i+1] << 8) >> 3;
-        sign = get_sign(buffer);
-        magnitude = get_magnitude(buffer);
+        sample = (data_of_file[i] | data_of_file[i+1] << 8) >> 3;
+        sign = get_sign(sample);
+        magnitude = get_magnitude(sample);
         compressed_codeword[i] = codeword_compression(magnitude, sign);
         count++;
-        fwrite( &compressed_codeword[i],sizeof(compressed_codeword[i]),1, output );
+        //fwrite( &compressed_codeword[i],sizeof(compressed_codeword[i]),1, output );
         
     }
+    printf("finished compressing\n");
     time_t  stop = clock();
     double compression_time = (double) (stop - start) / CLOCKS_PER_SEC;
     //set_new_file_size(output, count);
@@ -306,26 +307,25 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
     short out_sign;
     int another_counter = 0;
     __uint8_t  comp_codeword;
-    compressed_codeword[size+3];
-     FILE * something = fopen("something.md", "wb");
+    
+     
+     printf("decompressing data now\n");
     for (i=0; i < count; i++)
     {
+        //printf("seg fault happens at %d\n", i);
         comp_codeword = compressed_codeword[i];
         out_sign = (comp_codeword &0x80 ) >> 7;
         out_magnitude = get_magnitude_from_codeword(comp_codeword);
         out_sample =  (short)(out_sign ? out_magnitude : -out_magnitude);
         write_two_bytes_other(output, (uint16_t)(out_sample<<3), true);
-        if(ftell(something) < 4)
-        {
-            write_two_bytes_other(something, (uint16_t)(out_sample<<3), true);
-        }
+        
         
         another_counter++;
 
 
     }
-    fclose(something);
-
+    printf("finished decompressing data\n");
+  
 
     printf("chord count: count1: %d count2: %d count3: %d count4: %d count5:%d count6:%d count7:%d count8:%d \n", chord1, chord2, chord3, chord4, chord5, chord6, chord7, chord8);
     printf("total: %d\n", chord1+ chord2+ chord3+ chord4+ chord5+ chord6+ chord7+ chord8);
