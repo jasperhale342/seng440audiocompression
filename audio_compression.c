@@ -119,7 +119,7 @@ void read_data(FILE *wav_file, FILE *output, wav_header* wav_struct)
 
     for ( i= 0; i < size-1; i+=2)
     {
-        buffer = (data_of_file[i] | data_of_file[i+1] << 8) >> 3;
+        buffer = (data_of_file[i] | (data_of_file[i+1] << 8));
         sign = get_sign(buffer);
         magnitude = get_magnitude(buffer);
         compressed_codeword[i] = codeword_compression(magnitude, sign);
@@ -151,8 +151,6 @@ void write_header_to_new_file(wav_header* wav_info, FILE * output)
     uint8_t buffer_4[4];
     uint32_t new_file_size;
     uint32_t new_data_size;
-
-
 
     fseek(output,0,SEEK_SET);
     fwrite(&wav_info->riff, sizeof(wav_info->riff),1,output);
@@ -380,32 +378,7 @@ void get_wave_header_info(FILE* wav, wav_header* wav_info)
 
 }
 
-/*
-void initialize_struct(wav_header * wav_struct)
-{
-  wav_header *new_struct = (wav_header*)malloc(sizeof(new_struct));
-    new_struct->samples = 0;
-    new_struct->size_of_samples= 0;
-   
-    new_struct->RIFF=0;
-    //new_struct->RIFF= (uint8_t*)malloc(4*sizeof(uint8_t)); 
-   
-    new_struct->overall_size= 0;
-    new_struct->wave= 0;
-    new_struct->file_type_header= 0;
-    new_struct->format_chunk_marker= 0;
-    new_struct->format_data_length= 0;
-    new_struct->format_type= 0;
-    new_struct->num_channel= 0;
-    new_struct->sample_rate= 0;
-    new_struct->sr_btsps_channel= 0; 
-    new_struct->bits_per_sample_channel= 0; 
-    new_struct->bits_per_sample= 0; 
-    new_struct->data_header= 0; 
-    new_struct->sizeof_data_section= 0;
-    wav_struct = new_struct;
-}
-**/
+
 uint16_t get_magnitude(short sample)
 {
     return (uint16_t) (sample < 0 ? -sample : sample);
@@ -429,51 +402,38 @@ uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign )
     if( sample_magnitude & (1 << 11)) {
         chord = 0x7 ;
         step = ( sample_magnitude >> 7) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 10)) {
+    else if( sample_magnitude & (1 << 10)) {
         chord = 0x6 ;
         step = ( sample_magnitude >> 6) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 9)) {
+    else if( sample_magnitude & (1 << 9)) {
         chord = 0x5 ;
         step = ( sample_magnitude >> 5) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 8)) {
+    else if( sample_magnitude & (1 << 8)) {
         chord = 0x4 ;
         step = ( sample_magnitude >> 4) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 7)) {
+    else if( sample_magnitude & (1 << 7)) {
         chord = 0x3 ;
         step = ( sample_magnitude >> 3) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 6)) {
+    else if( sample_magnitude & (1 << 6)) {
         chord = 0x2 ;
         step = ( sample_magnitude >> 2) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude & (1 << 5)) {
+    else if( sample_magnitude & (1 << 5)) {
         chord = 0x1 ;
         step = ( sample_magnitude >> 1) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
     }
-    if( sample_magnitude >> 5 == 0) {
+    else {
         chord = 0x0 ;
-        step = ( sample_magnitude ) & 0xF ;
-        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
-        return (codeword_tmp );
+        step = ( sample_magnitude >> 1) & 0xF ;
     }
+        codeword_tmp = ( sign << 7) | ( chord << 4) | step ;
+        return (codeword_tmp ^ 0x55);
+
 }
 
 
