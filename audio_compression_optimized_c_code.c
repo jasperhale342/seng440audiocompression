@@ -43,22 +43,49 @@ void write_decoded_data(int16_t* decompressed_codeword, FILE* wav_file, int arr_
 void read_data(FILE *wav_file, WAV_HEADER* wav_struct);
 
 void encode_data(uint8_t * data_of_file , uint8_t * compressed_codeword, int arr_size){  
-    short buffer;
-    uint8_t sign;
-    uint16_t magnitude;
+    short buffer_1;
+    short buffer_2;
+    short buffer_3;
+    short buffer_4;
+    uint8_t sign_1;
+    uint8_t sign_2;
+    uint8_t sign_3;
+    uint8_t sign_4;
+    uint16_t magnitude_1;
+    uint16_t magnitude_2;
+    uint16_t magnitude_3;
+    uint16_t magnitude_4;
     time_t  start = clock();
    
     int i; // sample array iterator
-    int index;
+    int index_1;
+    int index_2;
+    int index_3;
+    int index_4;
 
-    for ( i= 0; i < arr_size-1; i+=2)
+    for ( i= 0; i < arr_size-1; i+=8)
     {
-        index = i >> 1;
-        buffer = (data_of_file[i] | (data_of_file[i+1] << 8));
-        sign = get_sign(buffer);
-        magnitude = get_magnitude(buffer);
-        compressed_codeword[index] = codeword_compression(magnitude, sign);
-        
+        index_1 = i >> 1;
+        index_2 = index_1 + 1;
+        index_3 = index_1 + 2;
+        index_4 = index_1 + 3;
+        buffer_1 = (data_of_file[i] | (data_of_file[i+1] << 8));
+        buffer_2 = (data_of_file[i+2] | (data_of_file[i+3] <<8));
+        buffer_3 = (data_of_file[i+4] | (data_of_file[i+5] <<8));
+        buffer_4 = (data_of_file[i+6] | (data_of_file[i+7] <<8));
+        sign_1 = get_sign(buffer_1);
+        sign_2 = get_sign(buffer_2);
+        sign_3 = get_sign(buffer_3);
+        sign_4 = get_sign(buffer_4);
+        magnitude_1 = get_magnitude(buffer_1);
+        magnitude_2 = get_magnitude(buffer_2);
+        magnitude_3 = get_magnitude(buffer_3);
+        magnitude_4 = get_magnitude(buffer_4);
+        compressed_codeword[index_1] = codeword_compression(magnitude_1, sign_1);
+        compressed_codeword[index_2] = codeword_compression(magnitude_2, sign_2);
+        compressed_codeword[index_3] = codeword_compression(magnitude_3, sign_3);
+        compressed_codeword[index_4] = codeword_compression(magnitude_4, sign_4);
+               
     }
 
     time_t  stop = clock();
@@ -77,7 +104,7 @@ void decode_data(uint8_t* compressed_codeword , int16_t* decompressed_codeword, 
     }
 }
 void write_encoded_data(uint8_t* compressed_codeword, WAV_HEADER* header, int arr_size){
-    FILE * output = fopen("input_compressed.wav", "wb");
+    FILE * output = fopen("optimized_input_compressed.wav", "wb");
     write_header_encoded_file(header,output);
 
     for(int i=0;i<arr_size;i++){
@@ -87,7 +114,7 @@ void write_encoded_data(uint8_t* compressed_codeword, WAV_HEADER* header, int ar
     fclose(output);
 }
 void write_decoded_data(int16_t* decompressed_codeword, FILE* wav_file, int arr_size){
-    FILE * output = fopen("input_decompressed.wav", "wb");
+    FILE * output = fopen("optimized_input_decompressed.wav", "wb");
     write_header_decoded_file(wav_file,output);
 
     for(int i=0;i<arr_size;i++){
