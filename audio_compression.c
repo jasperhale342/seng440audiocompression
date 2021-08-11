@@ -69,8 +69,8 @@ void encode_data(uint8_t * data_of_file , uint8_t * compressed_codeword, int arr
 void decode_data(uint8_t* compressed_codeword , int16_t* decompressed_codeword, int arr_size){
     int16_t out_sample;
     uint8_t codeword;
-
-    for(int i=0;i<arr_size;i++){
+    int i;
+    for( i=0;i<arr_size;i++){
         codeword = (compressed_codeword[i] ^ 0x55);
         out_sample = codeword_decompression(codeword);
         decompressed_codeword[i] = out_sample;
@@ -79,8 +79,8 @@ void decode_data(uint8_t* compressed_codeword , int16_t* decompressed_codeword, 
 void write_encoded_data(uint8_t* compressed_codeword, WAV_HEADER* header, int arr_size){
     FILE * output = fopen("input_compressed.wav", "wb");
     write_header_encoded_file(header,output);
-
-    for(int i=0;i<arr_size;i++){
+    int i;
+    for(i=0;i<arr_size;i++){
         fwrite(&compressed_codeword[i],sizeof(uint8_t),1,output);
     }
 
@@ -89,8 +89,8 @@ void write_encoded_data(uint8_t* compressed_codeword, WAV_HEADER* header, int ar
 void write_decoded_data(int16_t* decompressed_codeword, FILE* wav_file, int arr_size){
     FILE * output = fopen("input_decompressed.wav", "wb");
     write_header_decoded_file(wav_file,output);
-
-    for(int i=0;i<arr_size;i++){
+    int i;
+    for(i=0;i<arr_size;i++){
         fwrite(&decompressed_codeword[i],sizeof(int16_t),1,output);
     }
 
