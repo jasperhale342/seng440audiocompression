@@ -207,7 +207,7 @@ void write_header_encoded_file(WAV_HEADER* wav_info, FILE * output){
 int16_t codeword_decompression(uint8_t codeword){
     int magnitude;
     int mode = 0;
-    __asm__ ("alaw   %0, %1, %2":"=r"(magnitude),"r"(codeword),"r"(mode));
+    __asm__ ("alaw   %0, %1, %2":"=r"(magnitude):"r"(codeword),"r"(mode));
     return (int16_t) (magnitude);
 }
 void get_wave_header_info(FILE* wav, WAV_HEADER* wav_info){
@@ -313,7 +313,7 @@ uint8_t get_sign(short buffer){
 uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign ) {
     uint8_t codeword_tmp = sign <<7;
     int mode = 1;
-    __asm__ ("alaw   %0, %1, %2":"=r"(codeword_tmp),"r"(sample_magnitude),"r"(mode));
+    __asm__ ("alaw   %0, %1, %2":"=r"(codeword_tmp):"r"(sample_magnitude),"r"(mode));
     return (codeword_tmp);
 
 }
