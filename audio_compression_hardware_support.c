@@ -82,8 +82,8 @@ void decode_data(uint8_t* compressed_codeword , int16_t* decompressed_codeword, 
 void write_encoded_data(uint8_t* compressed_codeword, WAV_HEADER* header, int arr_size){
     FILE * output = fopen("input_compressed.wav", "wb");
     write_header_encoded_file(header,output);
-
-    for(int i=0;i<arr_size;i++){
+    int i;
+    for(i=0;i<arr_size;i++){
         fwrite(&compressed_codeword[i],sizeof(uint8_t),1,output);
     }
 
