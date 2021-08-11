@@ -34,7 +34,7 @@ void write_header_encoded_file(WAV_HEADER * wav_info, FILE * output);
 void write_header_decoded_file(FILE *input, FILE * output);
 uint8_t get_sign(short buffer);
 uint16_t get_magnitude(short sample);
-uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign );
+inline uint8_t codeword_compression ( register uint16_t sample_magnitude , register uint8_t sign );
 int16_t codeword_decompression(uint8_t codeword);
 void encode_data(uint8_t * data_of_file , uint8_t * compressed_codeword, int arr_size);
 void decode_data(uint8_t* compressed_codeword , int16_t* decompressed_codeword, int arr_size);
@@ -310,9 +310,9 @@ uint8_t get_sign(short buffer){
     if(buffer >= 0){return 1;} //positive
     return 0; //negative   
 }
-uint8_t codeword_compression ( uint16_t sample_magnitude , uint8_t sign ) {
-    uint8_t codeword_tmp = sign <<7;
-    int mode = 1;
+inline uint8_t codeword_compression ( register uint16_t sample_magnitude , register uint8_t sign ) {
+    register uint8_t codeword_tmp = sign <<7;
+    register int mode = 1;
     __asm__ ("alaw   %0, %1, %2":"=r"(codeword_tmp):"r"(sample_magnitude),"r"(mode));
     return (codeword_tmp);
 
