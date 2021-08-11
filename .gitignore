@@ -1,0 +1,3 @@
+#ignore executables and text files
+audio_compression
+audio_compression_optimized_c_code
